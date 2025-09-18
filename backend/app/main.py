@@ -8,23 +8,27 @@ from .schemas import MessageCreate, MessageRead
 import asyncio
 from .routers import messages, auth
 from .dependencies import get_db
+from .config import FRONTEND_URL
 
 app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000",
-                   "http://127.0.0.1:3000"
+                   "http://127.0.0.1:3000",
+                   "http://localhost:5173",
+                   FRONTEND_URL
                    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"]
 )
 
 # function to create tables
 async def init_db():
     async with engine.begin() as conn:
-        # await conn.run_sync(Base.metadata.drop_all)
+        # await conn.run_sync(Base.metadata.drop_all) // clear db
         await conn.run_sync(Base.metadata.create_all)
         print("Database tables created or already exist!")
 
