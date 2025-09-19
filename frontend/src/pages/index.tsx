@@ -1,12 +1,14 @@
 import Chat from '@/components/chat'
-import Authenticate from '@/components/auth';
+import Auth from '@/components/auth';
+import Profile from '@/components/profile'
 
 export default function Home() {
 
   return (
     <div>
-      <Authenticate />
+      <Auth />
       <br/>
+      <Profile />
       <Chat />
     </div>
   );
