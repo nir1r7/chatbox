@@ -4,7 +4,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc, asc, delete
 from .db.session import AsyncSessionLocal, engine, Base
 from .db import models
-from .schemas import MessageCreate, MessageRead
 import asyncio
 from .routers import messages, auth
 from .dependencies import get_db
@@ -28,7 +27,7 @@ app.add_middleware(
 # function to create tables
 async def init_db():
     async with engine.begin() as conn:
-        # await conn.run_sync(Base.metadata.drop_all) // clear db
+        # await conn.run_sync(Base.metadata.drop_all) # clear db
         await conn.run_sync(Base.metadata.create_all)
         print("Database tables created or already exist!")
 

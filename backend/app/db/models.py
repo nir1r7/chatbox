@@ -1,5 +1,5 @@
-from sqlalchemy import Integer, String
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import Integer, String, ForeignKey
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .session import Base
 
 class Message(Base):
@@ -8,6 +8,9 @@ class Message(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     content: Mapped[str] = mapped_column(String, nullable=False)
 
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    user: Mapped["User"] = relationship("User", back_populates="messages")
+
 class User(Base):
     __tablename__ = "users"
 
@@ -15,3 +18,5 @@ class User(Base):
     name: Mapped[str] = mapped_column(String, nullable=False)
     email: Mapped[str] = mapped_column(String, nullable=False, unique=True)
     password: Mapped[str] = mapped_column(String, nullable=False)
+    
+    messages: Mapped[list["Message"]] = relationship("Message", back_populates="user", cascade="all, delete-orphan", lazy="selectin")

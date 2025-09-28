@@ -7,7 +7,7 @@ import jwt
 import re
 
 from ..db import models
-from ..schemas import CreateUser, ReadUser, LoginRequest, TokenResponse
+from ..schemas import CreateUser, ReadUserBasic, ReadUserWithMessages, LoginRequest, TokenResponse
 from ..dependencies import get_db, get_current_user
 from ..config import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
 
@@ -25,13 +25,13 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm = ALGORITHM)
 
-@router.get("/users", response_model = list[ReadUser])
+@router.get("/users", response_model = list[ReadUserWithMessages])
 async def get_users(db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(models.User).order_by(asc(models.User.id)))
     users = result.scalars().all()
     return users
 
-@router.get("/me", response_model=ReadUser)
+@router.get("/me", response_model=ReadUserBasic)
 async def get_users_me(current_user = Depends(get_current_user)):
     return current_user
 

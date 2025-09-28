@@ -2,6 +2,7 @@ from fastapi import Depends, HTTPException
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from sqlalchemy.orm import selectinload
 import jwt
 
 from .db.session import AsyncSessionLocal
@@ -25,7 +26,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession
     except jwt.PyJWTError:
         raise HTTPException(status_code = 401, detail = "Invalid token.")
 
-    result = await db.execute(select(models.User).where(models.User.id == int(user_id)))
+    result = await db.execute(select(models.User).options(selectinload(models.User.messages)).where(models.User.id == int(user_id)))
     user = result.scalar_one_or_none()
 
     if user is None:
