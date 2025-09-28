@@ -39,6 +39,17 @@ async def create_message(message: MessageCreate, db: AsyncSession = Depends(get_
         raise HTTPException(status_code=500, detail="Failed to create messages")
 
 @router.delete("/{message_id}")
-async def delete_message(message_id: int, db: AsyncSession = Depends(get_db)):
-    await db.execute(delete(models.Message).where(models.Message.id == message_id))
+async def delete_message(message_id: int, db: AsyncSession = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    result = await db.execute(select(models.Message).where(models.Message.id == message_id))
+    message = result.scalar_one_or_none()
+    
+    if not message:
+        raise HTTPException(status_code=404, detail="Message not found")
+
+    if message.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to delete this message")
+
+    await db.delete(message)
     await db.commit()
+
+    return {"detail": "Message deleted"}

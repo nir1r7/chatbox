@@ -1,13 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Message } from '@/types';
-import { useAuth } from '../../../context/AuthContext';
+import { useAuth } from '@/context/AuthContext';
 
 function Chat(){
     const [messages, setMessages] = useState<Message[]>([])
     const [input, setInput] = useState<string>("")
     const { user, token } = useAuth();
 
-    const fetchMessages = async () => {
+    const fetchMessages = useCallback(async () => {
         if (!token) return
         const res = await fetch("http://127.0.0.1:8000/api/messages/", {
             headers: {
@@ -16,7 +16,7 @@ function Chat(){
         });
         const data = await res.json();
         setMessages(data);
-    };
+    }, [token]);
 
     const sendMessage = async () => {
         if (!input) return;
@@ -57,7 +57,7 @@ function Chat(){
 
     useEffect(() => {
         fetchMessages();
-    }, []);
+    }, [fetchMessages]);
 
     return (
         <div>
@@ -65,7 +65,18 @@ function Chat(){
             <ul>
                 {messages.map((msg: Message) => (
                 <li key={msg.id}>
-                    <button style={{border: "1px solid red"}} onClick={() => deleteMessage(msg.id)}>X</button>
+                    {msg.user && user && msg.user.id === user.id ?
+                    (
+                        <button
+                            style={{ border: "1px solid red", marginLeft: "8px" }}
+                            onClick={() => deleteMessage(msg.id)}
+                        >
+                        X
+                        </button>
+                    ) : (
+                        <span style={{marginLeft: "20px"}}></span>
+                    )
+                }
                     {msg.user && msg.user.name}: {msg.content}
                 </li>
                 ))}
