@@ -5,7 +5,7 @@ from sqlalchemy import select, desc, asc, delete
 from .db.session import AsyncSessionLocal, engine, Base
 from .db import models
 import asyncio
-from .routers import messages, auth
+from .routers import messages, auth, ws
 from .dependencies import get_db
 from .config import FRONTEND_URL
 
@@ -41,3 +41,4 @@ async def root():
 
 app.include_router(messages.router)
 app.include_router(auth.router)
+app.include_router(ws.router)

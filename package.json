@@ -1,0 +1,8 @@
+{
+  "dependencies": {
+    "react-window": "^2.2.0"
+  },
+  "devDependencies": {
+    "@types/react-window": "^1.8.8"
+  }
+}

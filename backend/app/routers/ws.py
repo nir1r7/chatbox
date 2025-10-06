@@ -1,22 +1,31 @@
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends
-from core.connections_manager import ConnectionManager
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
+from ..core.connection_manager import ConnectionManager
+from jose import JWTError, jwt
+from ..config import SECRET_KEY, ALGORITHM
+import json
 
-from ..db import models
-from ..dependencies import get_db, get_current_user
-
-router = APIRouter()
+router = APIRouter(prefix="/ws", tags=["websockets"])
 manager = ConnectionManager()
 
-@router.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket, current_user: models.User = Depends(get_current_user)):
-    user_id = get_current_user.id
-    
-    await manager.connection(websocket, user_id)
+@router.websocket("/chat")
+async def websocket_endpoint(websocket: WebSocket, token: str = Query(...)):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id: int = int(payload.get("sub"))
+    except JWTError:
+        await websocket.close()
+        return
+
+    await manager.connect(websocket, user_id)
+
     try:
         while True:
-            data = await websocket.recieve_text()
-            # temporary
-            await manager.send_personal_message(f"yo dumb ahh wrote: {data}", user_id)
-            await manager.broadcast(f"User id {user_id} sasys: {data}")
+            data = await websocket.receive_text()
+            # Expect saved message object from frontend
+            try:
+                message_obj = json.loads(data)
+                await manager.broadcast(json.dumps(message_obj))
+            except json.JSONDecodeError:
+                print("Invalid message received, ignoring")
     except WebSocketDisconnect:
         manager.disconnect(websocket, user_id)

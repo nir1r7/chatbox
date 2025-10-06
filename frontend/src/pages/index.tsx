@@ -1,4 +1,4 @@
-import Chat from '@/components/chat';
+import ChatBox from '@/components/chatbox';
 import Auth from '@/components/auth';
 import Profile from '@/components/profile';
 import { useAuth } from '../context/AuthContext';
@@ -11,7 +11,7 @@ export default function Home() {
       <Auth />
       <br/>
       <Profile />
-      {user && <Chat />}
+      {user && <ChatBox />}
     </div>
   );
 }
