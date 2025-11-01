@@ -15,7 +15,6 @@ class ConnectionManager:
     def disconnect(self, websocket: WebSocket, user_id: int):
         if user_id in self.active_connections:
             self.active_connections[user_id].remove(websocket)
-            # Fix typo: 'iser_id' → 'user_id'
             if not self.active_connections[user_id]:
                 del self.active_connections[user_id]
 
@@ -30,3 +29,5 @@ class ConnectionManager:
         for connections in self.active_connections.values():
             for connection in connections:
                 await connection.send_text(message)
+
+manager = ConnectionManager()

@@ -6,6 +6,8 @@ from sqlalchemy.orm import selectinload
 from ..db import models
 from ..schemas import MessageCreate, MessageReadWithUser
 from ..dependencies import get_db, get_current_user
+from ..core.connection_manager import manager
+import json
 
 router = APIRouter(
     prefix="/api/messages",
@@ -51,5 +53,11 @@ async def delete_message(message_id: int, db: AsyncSession = Depends(get_db), cu
 
     await db.delete(message)
     await db.commit()
+
+    delete_event = json.dumps({
+        "type": "delete",
+        "message_id": message_id
+    })
+    await manager.broadcast(delete_event)
 
     return {"detail": "Message deleted"}

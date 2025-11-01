@@ -4,7 +4,7 @@ import { useAuth } from "@/context/AuthContext";
 import { Message } from "@/types";
 
 function ChatBox() {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const wsRef = useRef<WebSocket | null>(null);
@@ -38,8 +38,15 @@ function ChatBox() {
 
     ws.onmessage = (event) => {
       try {
-        const newMessage: Message = JSON.parse(event.data);
-        setMessages((prev) => [...prev, newMessage]);
+        const data = JSON.parse(event.data);
+
+        if (data.type === "delete") {
+          setMessages((prev) => prev.filter((m) => m.id !== data.message_id));
+        } else if (data.type === "message") {
+          setMessages((prev) => [...prev, data]);
+        } else {
+          console.warn("Unknown WebSocket event type:", data);
+        }
       } catch (err) {
         console.error("Failed to parse websocket message:", err);
       }
@@ -99,6 +106,52 @@ function ChatBox() {
     }
   }, [input, token]);
 
+  // Delete message
+  const deleteMessage = useCallback(
+    async (messageId: number) => {
+      if (!token) return;
+      try {
+        const res = await fetch(`http://127.0.0.1:8000/api/messages/${messageId}`, {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) throw new Error("Failed to delete message");
+        setMessages((prev) => prev.filter((m) => m.id !== messageId));
+      } catch (err) {
+        console.error("Error deleting message:", err);
+      }
+    },
+    [token]
+  );
+
+  // Format timestamp
+  const formatTimestamp = (timestamp?: string) => {
+    if (!timestamp) return "";
+
+    const date = new Date(timestamp);
+    const now = new Date();
+
+    const isToday =
+      date.getDate() === now.getDate() &&
+      date.getMonth() === now.getMonth() &&
+      date.getFullYear() === now.getFullYear();
+
+    const yesterday = new Date();
+    yesterday.setDate(now.getDate() - 1);
+    const isYesterday =
+      date.getDate() === yesterday.getDate() &&
+      date.getMonth() === yesterday.getMonth() &&
+      date.getFullYear() === yesterday.getFullYear();
+
+    if (isToday) {
+      return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    } else if (isYesterday) {
+      return "Yesterday";
+    } else {
+      return `${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()}`;
+    }
+  };
+
   return (
     <div style={{ border: "1px solid black", padding: "10px", marginTop: "20px" }}>
       <h2>Live Chat</h2>
@@ -109,6 +162,14 @@ function ChatBox() {
         {messages.map((msg) => (
           <div key={msg.id}>
             <strong>{msg.user.name}:</strong> {msg.content}
+            <span style={{ fontSize: "0.8em", color: "gray", marginLeft: "8px" }}>
+                {formatTimestamp(msg.created_at)}
+            </span>
+            {msg.user.id === user?.id && (
+              <button onClick={() => deleteMessage(msg.id)} style={{marginLeft: "10px", border: "none", background: "transparent", color: "red", cursor: "pointer"}}>
+                ✕
+              </button>
+            )}
           </div>
         ))}
       </div>

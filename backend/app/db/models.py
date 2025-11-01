@@ -1,5 +1,6 @@
-from sqlalchemy import Integer, String, ForeignKey
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from datetime import datetime
 from .session import Base
 
 class Message(Base):
@@ -10,6 +11,12 @@ class Message(Base):
 
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     user: Mapped["User"] = relationship("User", back_populates="messages")
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False
+    )
 
 class User(Base):
     __tablename__ = "users"

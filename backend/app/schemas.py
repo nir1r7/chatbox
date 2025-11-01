@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-
+from datetime import datetime
 
 # =========================
 # User schemas
@@ -45,6 +45,7 @@ class MessageReadWithUser(BaseModel):
     id: int
     content: str
     user: ReadUserBasic
+    created_at: datetime
 
     model_config = {
         "from_attributes": True
@@ -53,6 +54,7 @@ class MessageReadWithUser(BaseModel):
 class MessageReadWithoutUser(BaseModel):
     id: int
     content: str
+    created_at: datetime
 
     model_config = {
         "from_attributes": True

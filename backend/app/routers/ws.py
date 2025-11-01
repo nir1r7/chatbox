@@ -1,11 +1,10 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
-from ..core.connection_manager import ConnectionManager
+from ..core.connection_manager import manager
 from jose import JWTError, jwt
 from ..config import SECRET_KEY, ALGORITHM
 import json
 
 router = APIRouter(prefix="/ws", tags=["websockets"])
-manager = ConnectionManager()
 
 @router.websocket("/chat")
 async def websocket_endpoint(websocket: WebSocket, token: str = Query(...)):
@@ -24,6 +23,8 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(...)):
             # Expect saved message object from frontend
             try:
                 message_obj = json.loads(data)
+                if "type" not in message_obj:
+                    message_obj["type"] = "message"
                 await manager.broadcast(json.dumps(message_obj))
             except json.JSONDecodeError:
                 print("Invalid message received, ignoring")

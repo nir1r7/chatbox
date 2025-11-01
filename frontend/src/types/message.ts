@@ -7,4 +7,5 @@ export interface Message {
         name: string;
         email: string;
     };
+    created_at: string
 };
