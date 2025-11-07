@@ -5,8 +5,11 @@ import { Message } from "@/types";
 
 function ChatBox() {
   const { token, user } = useAuth();
+  const [activeRoom, setActiveRoom] = useState("general");
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
+  const roomMap: Record<string, number> = { general: 1, devs: 2, random: 3 };
+  const activeRoomId = roomMap[activeRoom];
   const wsRef = useRef<WebSocket | null>(null);
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
   const autoScrollRef = useRef(true);
@@ -28,18 +31,17 @@ function ChatBox() {
     fetchHistory();
   }, [token]);
 
-  // Setup WebSocket
+  // Setup WebSocket (room-aware)
   useEffect(() => {
-    if (!token) return;
-    const ws = new WebSocket(`ws://127.0.0.1:8000/ws/chat?token=${token}`);
+    if (!token || !activeRoom) return;
+    const ws = new WebSocket(`ws://localhost:8000/ws/chat/${activeRoom}?token=${token}`);
     wsRef.current = ws;
 
-    ws.onopen = () => console.log("Connected to WebSocket");
+    ws.onopen = () => console.log(`Connected to WebSocket room: ${activeRoom}`);
 
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-
         if (data.type === "delete") {
           setMessages((prev) => prev.filter((m) => m.id !== data.message_id));
         } else if (data.type === "message") {
@@ -52,10 +54,10 @@ function ChatBox() {
       }
     };
 
-    ws.onclose = () => console.log("WebSocket connection closed");
+    ws.onclose = () => console.log(`WebSocket for room '${activeRoom}' closed`);
 
     return () => ws.close();
-  }, [token]);
+  }, [token, activeRoom]);
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -80,31 +82,31 @@ function ChatBox() {
     return () => container.removeEventListener("scroll", handleScroll);
   }, [handleScroll]);
 
+  // Send message
   const sendMessage = useCallback(async () => {
-    if (!input || !token) return;
+    if (!input || !token || !activeRoom) return;
 
     try {
-      // Persist via REST API
-      const res = await fetch("http://127.0.0.1:8000/api/messages/", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ content: input }),
-      });
-      const savedMessage: Message = await res.json();
+        const res = await fetch("http://127.0.0.1:8000/api/messages/", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ content: input, room_id: activeRoomId }),
+        });
+        const savedMessage: Message = await res.json();
 
-      // Broadcast via WebSocket
-      if (wsRef.current?.readyState === WebSocket.OPEN) {
-        wsRef.current.send(JSON.stringify(savedMessage));
-      }
+        if (wsRef.current?.readyState === WebSocket.OPEN) {
+            wsRef.current.send(JSON.stringify(savedMessage));
+        }
 
-      setInput("");
+        setInput("");
     } catch (err) {
-      console.error("Failed to send message:", err);
+        console.error("Failed to send message:", err);
     }
-  }, [input, token]);
+  }, [input, token, activeRoom]);
+
 
   // Delete message
   const deleteMessage = useCallback(
@@ -154,7 +156,15 @@ function ChatBox() {
 
   return (
     <div style={{ border: "1px solid black", padding: "10px", marginTop: "20px" }}>
-      <h2>Live Chat</h2>
+      <h2>Live Chat — Room: {activeRoom}</h2>
+
+      {/* Room selector (for future multi-room support) */}
+      <div style={{ marginBottom: "10px" }}>
+        <button onClick={() => setActiveRoom("general")}>General</button>
+        <button onClick={() => setActiveRoom("devs")}>Devs</button>
+        <button onClick={() => setActiveRoom("random")}>Random</button>
+      </div>
+
       <div
         ref={messagesContainerRef}
         style={{ height: "200px", overflowY: "auto", border: "1px solid gray", padding: "5px" }}
@@ -163,16 +173,26 @@ function ChatBox() {
           <div key={msg.id}>
             <strong>{msg.user.name}:</strong> {msg.content}
             <span style={{ fontSize: "0.8em", color: "gray", marginLeft: "8px" }}>
-                {formatTimestamp(msg.created_at)}
+              {formatTimestamp(msg.created_at)}
             </span>
             {msg.user.id === user?.id && (
-              <button onClick={() => deleteMessage(msg.id)} style={{marginLeft: "10px", border: "none", background: "transparent", color: "red", cursor: "pointer"}}>
+              <button
+                onClick={() => deleteMessage(msg.id)}
+                style={{
+                  marginLeft: "10px",
+                  border: "none",
+                  background: "transparent",
+                  color: "red",
+                  cursor: "pointer",
+                }}
+              >
                 ✕
               </button>
             )}
           </div>
         ))}
       </div>
+
       <input
         style={{ border: "1px solid black", marginTop: "10px", width: "80%" }}
         value={input}

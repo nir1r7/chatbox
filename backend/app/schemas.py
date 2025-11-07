@@ -1,6 +1,23 @@
 from pydantic import BaseModel
 from datetime import datetime
 
+
+# =========================
+# Room schemas
+# =========================
+
+class RoomCreate(BaseModel):
+    name: str
+
+class RoomRead(BaseModel):
+    id: int
+    name: str
+
+    model_config = {
+        "from_attributes": True
+    }
+
+
 # =========================
 # User schemas
 # =========================
@@ -38,27 +55,23 @@ class ReadUserWithMessages(BaseModel):
 # Message schemas
 # =========================
 
+# Message schemas
 class MessageCreate(BaseModel):
     content: str
+    room_id: int  # Added this field to ensure room is provided
 
 class MessageReadWithUser(BaseModel):
     id: int
     content: str
     user: ReadUserBasic
+    room: RoomRead | None = None
     created_at: datetime
 
     model_config = {
         "from_attributes": True
     }
 
-class MessageReadWithoutUser(BaseModel):
-    id: int
-    content: str
-    created_at: datetime
 
-    model_config = {
-        "from_attributes": True
-    }
 
 # =========================
 # Auth schemas
