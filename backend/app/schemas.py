@@ -58,7 +58,7 @@ class ReadUserWithMessages(BaseModel):
 # Message schemas
 class MessageCreate(BaseModel):
     content: str
-    room_id: int  # Added this field to ensure room is provided
+    room_id: int
 
 class MessageReadWithUser(BaseModel):
     id: int

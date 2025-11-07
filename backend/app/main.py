@@ -8,6 +8,7 @@ import asyncio
 from .routers import messages, auth, ws
 from .dependencies import get_db
 from .config import FRONTEND_URL
+from .db.models import Room
 
 app = FastAPI()
 
@@ -31,9 +32,19 @@ async def init_db():
         await conn.run_sync(Base.metadata.create_all)
         print("Database tables created or already exist!")
 
+async def create_default_rooms():
+    async with AsyncSessionLocal() as session:
+        for room_name, room_id in {"general": 1, "devs": 2, "random": 3}.items():
+            result = await session.execute(select(Room).where(Room.id == room_id))
+            room = result.scalar_one_or_none()
+            if not room:
+                session.add(Room(id=room_id, name=room_name))
+        await session.commit()
+
 @app.on_event("startup")
 async def on_startup():
     await init_db()
+    await create_default_rooms()
 
 @app.get("/")
 async def root():

@@ -8,18 +8,25 @@ function ChatBox() {
   const [activeRoom, setActiveRoom] = useState("general");
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
-  const roomMap: Record<string, number> = { general: 1, devs: 2, random: 3 };
-  const activeRoomId = roomMap[activeRoom];
   const wsRef = useRef<WebSocket | null>(null);
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
   const autoScrollRef = useRef(true);
 
+  // Dynamic rooms (name → id)
+  const rooms: { name: string; id: number }[] = [
+    { name: "general", id: 1 },
+    { name: "devs", id: 2 },
+    { name: "random", id: 3 },
+  ];
+  const roomMap: Record<string, number> = Object.fromEntries(rooms.map(r => [r.name, r.id]));
+  const activeRoomId = roomMap[activeRoom];
+
   // Fetch chat history
   useEffect(() => {
-    if (!token) return;
+    if (!token || !activeRoomId) return;
     const fetchHistory = async () => {
       try {
-        const res = await fetch("http://127.0.0.1:8000/api/messages/", {
+        const res = await fetch(`http://127.0.0.1:8000/api/messages/?room_id=${activeRoomId}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         const data: Message[] = await res.json();
@@ -29,37 +36,55 @@ function ChatBox() {
       }
     };
     fetchHistory();
-  }, [token]);
+  }, [token, activeRoomId]);
 
-  // Setup WebSocket (room-aware)
-  useEffect(() => {
-    if (!token || !activeRoom) return;
-    const ws = new WebSocket(`ws://localhost:8000/ws/chat/${activeRoom}?token=${token}`);
-    wsRef.current = ws;
+  // WebSocket setup
+useEffect(() => {
+  if (!token || !activeRoom) return;
 
-    ws.onopen = () => console.log(`Connected to WebSocket room: ${activeRoom}`);
+  const ws = new WebSocket(
+    `ws://127.0.0.1:8000/ws/chat/${activeRoom}?token=${token}`
+  );
+  
+  ws.onopen = () => {
+    console.log(`Connected to room: ${activeRoom}`);
+  };
 
-    ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        if (data.type === "delete") {
-          setMessages((prev) => prev.filter((m) => m.id !== data.message_id));
-        } else if (data.type === "message") {
-          setMessages((prev) => [...prev, data]);
-        } else {
-          console.warn("Unknown WebSocket event type:", data);
-        }
-      } catch (err) {
-        console.error("Failed to parse websocket message:", err);
-      }
-    };
+  ws.onmessage = (event) => {
+    const data = JSON.parse(event.data);
+    
+    if (data.type === "message") {
+      // Add new message to state
+      setMessages((prev) => [...prev, {
+        id: data.id,
+        content: data.content,
+        user: data.user,
+        room_id: activeRoomId,
+        created_at: data.created_at
+      }]);
+    } else if (data.type === "delete") {
+      // Remove deleted message
+      setMessages((prev) => prev.filter(m => m.id !== data.message_id));
+    }
+  };
 
-    ws.onclose = () => console.log(`WebSocket for room '${activeRoom}' closed`);
+  ws.onerror = (error) => {
+    console.error("WebSocket error:", error);
+  };
 
-    return () => ws.close();
-  }, [token, activeRoom]);
+  ws.onclose = () => {
+    console.log("WebSocket closed");
+  };
 
-  // Auto-scroll to bottom
+  wsRef.current = ws;
+
+  return () => {
+    ws.close();
+    wsRef.current = null;
+  };
+}, [token, activeRoom, activeRoomId]);
+
+  // Auto-scroll
   useEffect(() => {
     if (!autoScrollRef.current) return;
     const container = messagesContainerRef.current;
@@ -67,7 +92,7 @@ function ChatBox() {
     container.scrollTop = container.scrollHeight;
   }, [messages]);
 
-  // Track scroll position
+  // Scroll tracking
   const handleScroll = useCallback(() => {
     const container = messagesContainerRef.current;
     if (!container) return;
@@ -82,12 +107,18 @@ function ChatBox() {
     return () => container.removeEventListener("scroll", handleScroll);
   }, [handleScroll]);
 
+  // clear old messages on room change
+  useEffect(() => {
+    setMessages([]);
+  }, [activeRoomId]);
+
+
   // Send message
   const sendMessage = useCallback(async () => {
-    if (!input || !token || !activeRoom) return;
+    if (!input || !token || !activeRoomId) return;
 
     try {
-        const res = await fetch("http://127.0.0.1:8000/api/messages/", {
+        await fetch("http://127.0.0.1:8000/api/messages/", {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
@@ -95,17 +126,12 @@ function ChatBox() {
             },
             body: JSON.stringify({ content: input, room_id: activeRoomId }),
         });
-        const savedMessage: Message = await res.json();
 
-        if (wsRef.current?.readyState === WebSocket.OPEN) {
-            wsRef.current.send(JSON.stringify(savedMessage));
-        }
-
-        setInput("");
+        setInput(""); // clear input
     } catch (err) {
         console.error("Failed to send message:", err);
     }
-  }, [input, token, activeRoom]);
+  }, [input, token, activeRoomId]);
 
 
   // Delete message
@@ -129,40 +155,41 @@ function ChatBox() {
   // Format timestamp
   const formatTimestamp = (timestamp?: string) => {
     if (!timestamp) return "";
-
     const date = new Date(timestamp);
     const now = new Date();
-
     const isToday =
       date.getDate() === now.getDate() &&
       date.getMonth() === now.getMonth() &&
       date.getFullYear() === now.getFullYear();
-
     const yesterday = new Date();
     yesterday.setDate(now.getDate() - 1);
     const isYesterday =
       date.getDate() === yesterday.getDate() &&
       date.getMonth() === yesterday.getMonth() &&
       date.getFullYear() === yesterday.getFullYear();
-
-    if (isToday) {
-      return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-    } else if (isYesterday) {
-      return "Yesterday";
-    } else {
-      return `${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()}`;
-    }
+    if (isToday) return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    if (isYesterday) return "Yesterday";
+    return `${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()}`;
   };
 
   return (
     <div style={{ border: "1px solid black", padding: "10px", marginTop: "20px" }}>
       <h2>Live Chat — Room: {activeRoom}</h2>
 
-      {/* Room selector (for future multi-room support) */}
+      {/* Dynamic Room Selector */}
       <div style={{ marginBottom: "10px" }}>
-        <button onClick={() => setActiveRoom("general")}>General</button>
-        <button onClick={() => setActiveRoom("devs")}>Devs</button>
-        <button onClick={() => setActiveRoom("random")}>Random</button>
+        {rooms.map((room) => (
+          <button
+            key={room.id}
+            onClick={() => setActiveRoom(room.name)}
+            style={{
+              fontWeight: room.name === activeRoom ? "bold" : "normal",
+              marginRight: "5px",
+            }}
+          >
+            {room.name.charAt(0).toUpperCase() + room.name.slice(1)}
+          </button>
+        ))}
       </div>
 
       <div
