@@ -30,7 +30,7 @@ uvicorn app.main:app --reload
 cd frontend
 npm install
 ```
-
+ 
 2. Start the development server
 ```bash
 npm run dev
